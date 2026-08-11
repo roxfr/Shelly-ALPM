@@ -151,7 +151,7 @@ pub const TransactionLog = struct {
         switch (event) {
             .started => {
                 if (envelope.parent_id == null)
-                    self.writeEntry(self.allocator, .info, source, "transaction started");
+                    self.writeEntry(self.allocator, .info, source, "Transaction started");
             },
             .progress => {},
             .status => |status| switch (status.level) {
@@ -163,9 +163,9 @@ pub const TransactionLog = struct {
             .completed => |completed| {
                 if (envelope.parent_id != null) return;
                 const message: []const u8 = switch (completed.status) {
-                    .success => "transaction completed",
-                    .failed => "transaction failed",
-                    .cancelled => "transaction cancelled",
+                    .success => "Transaction completed",
+                    .failed => "Transaction failed",
+                    .cancelled => "Transaction cancelled",
                 };
                 self.writeEntry(
                     self.allocator,
@@ -178,7 +178,7 @@ pub const TransactionLog = struct {
     }
 };
 
-pub fn writeUtcTime(writer: *std.Io.Writer, unix_seconds: u64,) !void {
+fn writeUtcTime(writer: *std.Io.Writer, unix_seconds: u64,) !void {
     const epoch_seconds = std.time.epoch.EpochSeconds{
         .secs = unix_seconds,
     };
