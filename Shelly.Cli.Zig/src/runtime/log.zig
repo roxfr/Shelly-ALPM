@@ -33,7 +33,6 @@ pub const SessionLog = struct {
         self.* = undefined;
     }
 
-    
     pub fn writeSessionHeader(
         self: *SessionLog,
         allocator: std.mem.Allocator,
@@ -133,7 +132,7 @@ pub const TransactionLog = struct {
         };
         buffer.writer.writeAll("[") catch return;
         writeUtcTime(&buffer.writer, raw) catch return;
-        buffer.writer.print("] Level: {s}  Source: {s} Message: {s}\n",.{ level_str, source_str, message },) catch return;        
+        buffer.writer.print("] {s} [{s}] {s}\n",.{ level_str, source_str, message },) catch return;        
         self.session.append(buffer.writer.buffered());
     }
 
