@@ -2707,10 +2707,7 @@ pub const Manager = struct {
         const self: *Manager = @ptrCast(@alignCast(ctx));
         const path = event.destination_path orelse "";
         switch (event.event_type) {
-            .Start => self.dispatcher.raiseInformational(.{
-                .event_type = .pkg_retrieve_start,
-                .message = path,
-            }),
+            .Start => {},
             .Progress => if (event.progress) |p| {
                 // CoreDownloader forwards rich byte progress to the logical
                 // download operation. Retain this fallback only for legacy

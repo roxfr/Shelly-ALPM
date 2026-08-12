@@ -153,7 +153,32 @@ pub const TransactionLog = struct {
                 if (envelope.parent_id == null)
                     self.writeEntry(self.allocator, .info, source, "Transaction started");
             },
-            .progress => {},
+            .progress => |progress| {
+                const update = progress.update;
+            
+                const stage = update.stage orelse return;
+                const message = update.message orelse return;
+            
+                const prefix = if (std.mem.eql(u8, stage, "hook"))
+                    "Running hook"
+                else
+                    return;
+            
+                const formatted = std.fmt.allocPrint(
+                    self.allocator,
+                    "{s}: {s}",
+                    .{ prefix, message },
+                ) catch return;
+            
+                defer self.allocator.free(formatted);
+            
+                self.writeEntry(
+                    self.allocator,
+                    .info,
+                    source,
+                    formatted,
+                );
+            },            
             .status => |status| switch (status.level) {
                 .debug => {},
                 .information, .success => self.writeEntry(self.allocator, .info, source, status.message),
