@@ -19,6 +19,8 @@ const PlanDialog = @import("../dialog/page/plan.zig").PlanDialog;
 const ProviderDialog = @import("../dialog/page/provider.zig").ProviderDialog;
 const translations = @import("../helpers/translations.zig");
 
+const log = std.log.scoped(.transaction_page);
+
 pub const TransactionRequest = struct {
     title: []const u8,
     argv: []const []const u8,
@@ -92,7 +94,7 @@ pub const TransactionPage = extern struct {
     fn init(self: *Self, _: *Class) callconv(.c) void {
         gtk.Widget.initTemplate(self.as(gtk.Widget));
         const p = self.priv();
-        std.debug.print("terminal_view={*} rows_box={*}\n", .{ p.terminal_view, p.rows_box });
+        log.debug("terminal_view={*} rows_box={*}", .{ p.terminal_view, p.rows_box });
 
         p.on_complete = null;
         p.on_complete_ctx = null;
@@ -525,10 +527,10 @@ pub const TransactionPage = extern struct {
         }
 
         if (p.on_complete) |cb| {
-            std.debug.print("on_complete set, ctx={}\n", .{p.on_complete_ctx != null});
+            log.debug("on_complete set, ctx={}", .{p.on_complete_ctx != null});
             if (p.on_complete_ctx) |c| cb(c, exit_code == 0 and !p.cancelled);
         } else {
-            std.debug.print("on_complete is NULL\n", .{});
+            log.debug("on_complete is NULL", .{});
         }
 
         if (p.operation) |op| {
@@ -734,7 +736,7 @@ pub const TransactionPage = extern struct {
 
     fn handle_question(self: *Self, pending: *PendingQuestion) void {
         const p = self.priv();
-        std.debug.print("handle_question: question_layer={*}\n", .{p.question_layer});
+        log.debug("handle_question: question_layer={*}", .{p.question_layer});
 
         switch (pending.request) {
             .yes_no => |q| {
@@ -756,7 +758,7 @@ pub const TransactionPage = extern struct {
                 gtk.Widget.setVisible(dialog.as(gtk.Widget), 1);
                 gtk.Widget.setHalign(p.question_layer.as(gtk.Widget), .center);
                 gtk.Widget.setValign(p.question_layer.as(gtk.Widget), .center);
-                std.debug.print("dialog widget: {*}, visible={}\n", .{ dialog, gtk.Widget.getVisible(dialog.as(gtk.Widget)) });
+                log.debug("dialog widget: {*}, visible={}", .{ dialog, gtk.Widget.getVisible(dialog.as(gtk.Widget)) });
             },
             .select_many => |q| {
                 pending.on_dismiss = &dismiss_question;
@@ -774,7 +776,7 @@ pub const TransactionPage = extern struct {
                 gtk.Widget.setVisible(p.question_layer.as(gtk.Widget), 1);
             },
             .select_one => |q| {
-                std.debug.print("select_one: {s}\n", .{q.prompt});
+                log.debug("select_one: {s}", .{q.prompt});
                 pending.on_dismiss = &dismiss_question;
                 pending.dismiss_ctx = self;
 

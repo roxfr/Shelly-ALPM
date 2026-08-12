@@ -1367,19 +1367,19 @@ msgid "Removing"
 msgstr "削除中"
 
 msgid "Checking keyring"
-msgstr ""
+msgstr "キーリングを確認中"
 
 msgid "Checking integrity"
-msgstr ""
+msgstr "整合性を確認中"
 
 msgid "Loading packages"
-msgstr ""
+msgstr "パッケージを読み込み中"
 
 msgid "Checking conflicts"
-msgstr ""
+msgstr "競合を確認中"
 
 msgid "Checking disk space"
-msgstr ""
+msgstr "ディスク容量を確認中"
 
 msgid "Working"
 msgstr "作業中"

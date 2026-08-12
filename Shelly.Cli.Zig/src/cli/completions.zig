@@ -225,9 +225,47 @@ fn renderZsh(manifest: *const spec.Manifest, writer: *std.Io.Writer) !void {
         \\#compdef shelly
         \\# Zsh completions for shelly
         \\# Auto-generated from the native Shelly CLI catalog. Do not edit.
+        \\
+        \\typeset -ga _shelly_repo_packages
+        \\typeset -ga _shelly_flatpak_remote_packages
+        \\
+        \\_shelly_packages_standard_sync() {
+        \\    if (( ${#_shelly_repo_packages} == 0 )); then
+        \\        _shelly_repo_packages=(${(f)"$(pacman -Slq 2>/dev/null)"})
+        \\    fi
+        \\    _describe -t packages 'package' _shelly_repo_packages
+        \\}
+        \\
+        \\_shelly_packages_standard_local() {
+        \\    local -a packages
+        \\    packages=(${(f)"$(pacman -Qq 2>/dev/null)"})
+        \\    _describe -t packages 'package' packages
+        \\}
+        \\
+        \\_shelly_packages_aur_local() {
+        \\    local -a packages
+        \\    packages=(${(f)"$(pacman -Qqm 2>/dev/null)"})
+        \\    _describe -t packages 'package' packages
+        \\}
+        \\
+        \\_shelly_packages_flatpak_remote() {
+        \\    if (( ${#_shelly_flatpak_remote_packages} == 0 )); then
+        \\        _shelly_flatpak_remote_packages=(${(f)"$(flatpak remote-ls --app --columns=application 2>/dev/null)"})
+        \\    fi
+        \\    _describe -t packages 'package' _shelly_flatpak_remote_packages
+        \\}
+        \\
+        \\_shelly_packages_flatpak_local() {
+        \\    local -a packages
+        \\    packages=(${(f)"$(flatpak list --app --columns=application 2>/dev/null)"})
+        \\    _describe -t packages 'package' packages
+        \\}
+        \\
         \\_shelly() {
-        \\    local action
+        \\    local action selector
+        \\    integer consumed=0
         \\    action=$words[2]
+        \\    selector=
         \\    if (( CURRENT == 2 )); then
         \\        local -a actions
         \\        actions=(
@@ -239,11 +277,37 @@ fn renderZsh(manifest: *const spec.Manifest, writer: *std.Io.Writer) !void {
         try writeZshEscaped(writer, action.description orelse "");
         try writer.writeAll("'\n");
     }
+    for (manifest.commands) |*command| {
+        const action_code = command.actionCode orelse continue;
+        var codes: [16]u8 = undefined;
+        for (collectTypeCodes(command, &codes)) |type_code| {
+            try writer.print("            '-{c}{c}:", .{ action_code, type_code });
+            try writeZshEscaped(writer, command.description orelse "");
+            try writer.writeAll("'\n");
+        }
+    }
     try writer.writeAll(
         \\        )
         \\        _describe 'command' actions
         \\        return
         \\    fi
+        \\    case $action in
+        \\
+    );
+    for (manifest.commands) |*command| {
+        const action_code = command.actionCode orelse continue;
+        var codes: [16]u8 = undefined;
+        for (collectTypeCodes(command, &codes)) |type_code| {
+            try writer.print("        -{c}{c}*) action={s}; selector={s}; consumed=1 ;;\n", .{
+                action_code,
+                type_code,
+                parentActionName(command),
+                command.name,
+            });
+        }
+    }
+    try writer.writeAll(
+        \\    esac
         \\    case $action in
         \\
     );
@@ -253,33 +317,61 @@ fn renderZsh(manifest: *const spec.Manifest, writer: *std.Io.Writer) !void {
         const default_child = manifest.findDefaultChild(action);
         if (default_child) |child| {
             if (hasNonDefaultChildren(manifest, action, child)) {
-                try writer.writeAll("            if (( CURRENT == 3 )); then\n                local -a commands\n                commands=(");
+                try writer.writeAll(
+                    \\            if [[ -z $selector ]]; then
+                    \\                if (( CURRENT == 3 )); then
+                    \\                    local -a commands
+                    \\                    commands=(
+                );
                 for (manifest.commands) |*other| {
                     if (!isChildOf(other, action) or other == child) continue;
                     try writer.print(" '{s}'", .{other.name});
                 }
-                try writer.writeAll(" )\n                _alternative 'commands:command:commands' 'options:option:(");
+                try writer.writeAll(" )\n                    _alternative 'commands:command:commands' 'options:option:(");
                 try writeEffectiveOptionWords(manifest, child, writer);
-                try writer.writeAll(")'\n                return\n            fi\n");
-                try writer.writeAll("            case $words[3] in\n");
+                try writer.writeAll(
+                    \\)'
+                    \\                    return
+                    \\                fi
+                    \\                selector=$words[3]
+                    \\                consumed=2
+                    \\            fi
+                    \\            case $selector in
+                    \\
+                );
                 for (manifest.commands) |*other| {
                     if (!isChildOf(other, action) or other == child) continue;
                     try writer.print("                {s}) ", .{other.name});
                     try writeZshArguments(manifest, other, writer);
                     try writer.writeAll(" ;;\n");
                 }
-                try writer.writeAll("                *) ");
+                try writer.print("                *) [[ $selector != {s} ]] && consumed=1; ", .{child.name});
                 try writeZshArguments(manifest, child, writer);
                 try writer.writeAll(" ;;\n            esac\n");
             } else {
-                try writer.writeAll("            ");
+                try writer.writeAll("            (( consumed == 0 )) && consumed=1; ");
                 try writeZshArguments(manifest, child, writer);
                 try writer.writeByte('\n');
             }
         } else {
-            try writer.writeAll("            if (( CURRENT == 3 )); then\n                local -a commands\n                commands=(");
+            try writer.writeAll(
+                \\            if [[ -z $selector ]]; then
+                \\                if (( CURRENT == 3 )); then
+                \\                    local -a commands
+                \\                    commands=(
+            );
             try writeChildNames(manifest, action, writer);
-            try writer.writeAll(")\n                _describe 'command' commands\n                return\n            fi\n            case $words[3] in\n");
+            try writer.writeAll(
+                \\)
+                \\                    _describe 'command' commands
+                \\                    return
+                \\                fi
+                \\                selector=$words[3]
+                \\                consumed=2
+                \\            fi
+                \\            case $selector in
+                \\
+            );
             for (manifest.commands) |*child| {
                 if (!isChildOf(child, action)) continue;
                 try writer.print("                {s}) ", .{child.name});
@@ -303,7 +395,9 @@ fn writeZshArguments(
     command: *const spec.Command,
     writer: *std.Io.Writer,
 ) !void {
-    try writer.writeAll("_arguments");
+    try writer.writeAll(
+        \\(( consumed > 0 )) && { words=("$words[1]" "${(@)words[consumed+2,$#words]}"); (( CURRENT -= consumed )); }; _arguments
+    );
     for (command.options) |option| {
         if (option.hidden) continue;
         try writer.writeAll(" ");
@@ -314,18 +408,42 @@ fn writeZshArguments(
         try writer.writeAll(" ");
         try writeZshOption(option, writer);
     }
+    if (packageCompleter(command)) |helper| {
+        if (command.arguments.len > 0)
+            try writeZshPositional(command.arguments[0], helper, writer);
+    } else if (isAppimageInstall(command)) {
+        if (command.arguments.len > 0)
+            try writeZshPositional(command.arguments[0], "_files -g \"*.AppImage\"", writer);
+    }
+}
+
+fn writeZshPositional(argument: spec.Argument, action: []const u8, writer: *std.Io.Writer) !void {
+    try writer.print(" '{s}{s}:{s}'", .{ zshPositionalPrefix(argument), argument.name, action });
+}
+
+fn zshPositionalPrefix(argument: spec.Argument) []const u8 {
+    const repeated = argument.maximumArity == null or argument.maximumArity.? > 1;
+    if (repeated) return "*:";
+    return if (argument.minimumArity == 0) "1::" else "1:";
 }
 
 fn writeZshOption(option: spec.Option, writer: *std.Io.Writer) !void {
-    try writer.writeByte('\'');
-    if (option.aliases.len > 0) {
-        try writer.writeByte('{');
-        try writer.writeAll(option.name);
-        for (option.aliases) |alias| try writer.print(",{s}", .{alias});
-        try writer.writeByte('}');
-    } else {
-        try writer.writeAll(option.name);
+    var wrote = false;
+    if (isZshArgumentsOptionName(option.name)) {
+        try writeZshOptionName(option.name, option, writer);
+        wrote = true;
     }
+    for (option.aliases) |alias| {
+        if (!isZshArgumentsOptionName(alias)) continue;
+        if (wrote) try writer.writeByte(' ');
+        try writeZshOptionName(alias, option, writer);
+        wrote = true;
+    }
+}
+
+fn writeZshOptionName(name: []const u8, option: spec.Option, writer: *std.Io.Writer) !void {
+    try writer.writeByte('\'');
+    try writer.writeAll(name);
     try writer.writeByte('[');
     try writeZshEscaped(writer, option.description orelse "");
     try writer.writeByte(']');
@@ -339,6 +457,54 @@ fn writeZshOption(option: spec.Option, writer: *std.Io.Writer) !void {
         }
     }
     try writer.writeByte('\'');
+}
+
+/// Returns true when `name` is a valid zsh `_arguments` option spec (`-x` or `--long`).
+fn isZshArgumentsOptionName(name: []const u8) bool {
+    if (!std.mem.startsWith(u8, name, "-")) return false;
+    return std.mem.indexOfAny(u8, name, "?/") == null;
+}
+
+/// Returns the primary type code followed by any catalog alias type codes.
+fn collectTypeCodes(command: *const spec.Command, buffer: *[16]u8) []const u8 {
+    var count: usize = 0;
+    if (command.typeCode) |type_code| {
+        buffer[count] = type_code;
+        count += 1;
+    }
+    for (command.aliasTypeCodes) |type_code| {
+        if (count >= buffer.len) break;
+        buffer[count] = type_code;
+        count += 1;
+    }
+    return buffer[0..count];
+}
+
+fn parentActionName(command: *const spec.Command) []const u8 {
+    const parent_path = command.parentPath orelse return command.name;
+    if (std.mem.lastIndexOfScalar(u8, parent_path, ' ')) |index|
+        return parent_path[index + 1 ..];
+    return parent_path;
+}
+
+fn packageCompleter(command: *const spec.Command) ?[]const u8 {
+    if (std.mem.eql(u8, command.path, "shelly install standard") or
+        std.mem.eql(u8, command.path, "shelly search standard"))
+        return "_shelly_packages_standard_sync";
+    if (std.mem.eql(u8, command.path, "shelly remove standard"))
+        return "_shelly_packages_standard_local";
+    if (std.mem.eql(u8, command.path, "shelly remove aur"))
+        return "_shelly_packages_aur_local";
+    if (std.mem.eql(u8, command.path, "shelly install flatpak") or
+        std.mem.eql(u8, command.path, "shelly search flatpak"))
+        return "_shelly_packages_flatpak_remote";
+    if (std.mem.eql(u8, command.path, "shelly remove flatpak"))
+        return "_shelly_packages_flatpak_local";
+    return null;
+}
+
+fn isAppimageInstall(command: *const spec.Command) bool {
+    return std.mem.eql(u8, command.path, "shelly install appimage");
 }
 
 fn writeZshEscaped(writer: *std.Io.Writer, value: []const u8) !void {
@@ -453,6 +619,16 @@ test "renders Bash Fish and Zsh scripts from the native catalog" {
         try std.testing.expect(std.mem.indexOf(u8, script, "pacfiles") != null);
         try std.testing.expect(std.mem.indexOf(u8, script, "threeway") != null);
         try std.testing.expect(std.mem.indexOf(u8, script, "bash fish zsh") != null);
+        if (expected.shell == .zsh) {
+            // Regression for malformed _arguments specs.
+            try std.testing.expect(std.mem.indexOf(u8, script, "'{--") == null);
+            try std.testing.expect(std.mem.indexOf(u8, script, "'/?[") == null);
+            // Shortcode completion is generated.
+            try std.testing.expect(std.mem.indexOf(u8, script, "'-Is:") != null);
+            // Repeated and single positional arguments are represented.
+            try std.testing.expect(std.mem.indexOf(u8, script, "'*:packages:") != null);
+            try std.testing.expect(std.mem.indexOf(u8, script, "'1:package:") != null);
+        }
     }
 }
 

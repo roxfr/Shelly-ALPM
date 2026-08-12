@@ -64,7 +64,7 @@ const Real = struct {
             .standard => runStandard(context, operation_context, invocation),
             .aur => runAur(context, operation_context, invocation),
             .flatpak => runFlatpakStep(context, operation_context, invocation),
-            .appimage => runAppImage(context, operation_context),
+            .appimage => runAppImage(context, operation_context, invocation),
         };
     }
 };
@@ -808,7 +808,19 @@ fn flatpakRelaunchArguments(
 fn runAppImage(
     context: *runtime.RuntimeContext,
     operation_context: *Zigalpm.OperationContext,
+    invocation: *const parser.Invocation,
 ) !void {
+    if (elevation.isRoot()) {
+        const args = try appimageUpgradeArgs(context.allocator, invocation.globals);
+        defer context.allocator.free(args);
+        if (try elevation.runAsInvokingUser(context, args)) |exit_code| {
+            if (exit_code != 0) return UpgradeError.BackendFailed;
+            return;
+        }
+        // A direct root invocation has no user to re-launch as. Continue
+        // with root's own user-scoped AppImage store in that case.
+    }
+
     const configuration = config_manager.Manager.init(context).read() catch
         try config_model.Config.defaults(context.allocator);
     const install_directory = stringValue(&configuration, "AppImageInstallPath") orelse
@@ -848,6 +860,22 @@ fn runAppImage(
         if (!try manager.update(update)) failed = true;
     }
     if (failed) return UpgradeError.BackendFailed;
+}
+
+fn appimageUpgradeArgs(
+    allocator: std.mem.Allocator,
+    globals: parser.GlobalOptions,
+) ![]const []const u8 {
+    var args: std.ArrayList([]const u8) = .empty;
+    errdefer args.deinit(allocator);
+    try args.appendSlice(allocator, &.{ "upgrade", "appimage" });
+    if (globals.no_confirm)
+        try args.append(allocator, "--no-confirm");
+    if (globals.json)
+        try args.append(allocator, "--json");
+    if (globals.ui_mode)
+        try args.append(allocator, "--ui-mode");
+    return args.toOwnedSlice(allocator);
 }
 
 fn reportBackendFailure(
@@ -1538,6 +1566,29 @@ test "flatpak relaunch forwards output modifiers to the nested invocation" {
     const plain_arguments = try flatpakRelaunchArguments(std.testing.allocator, .{});
     defer std.testing.allocator.free(plain_arguments);
     const expected_plain = [_][]const u8{ "upgrade", "flatpak" };
+    try std.testing.expectEqualSlices([]const u8, &expected_plain, plain_arguments);
+}
+
+test "appimage relaunch forwards output modifiers to the nested invocation" {
+    const ui_arguments = try appimageUpgradeArgs(
+        std.testing.allocator,
+        parser.GlobalOptions{ .no_confirm = true, .ui_mode = true },
+    );
+    defer std.testing.allocator.free(ui_arguments);
+    const expected_ui = [_][]const u8{ "upgrade", "appimage", "--no-confirm", "--ui-mode" };
+    try std.testing.expectEqualSlices([]const u8, &expected_ui, ui_arguments);
+
+    const json_arguments = try appimageUpgradeArgs(
+        std.testing.allocator,
+        parser.GlobalOptions{ .json = true },
+    );
+    defer std.testing.allocator.free(json_arguments);
+    const expected_json = [_][]const u8{ "upgrade", "appimage", "--json" };
+    try std.testing.expectEqualSlices([]const u8, &expected_json, json_arguments);
+
+    const plain_arguments = try appimageUpgradeArgs(std.testing.allocator, .{});
+    defer std.testing.allocator.free(plain_arguments);
+    const expected_plain = [_][]const u8{ "upgrade", "appimage" };
     try std.testing.expectEqualSlices([]const u8, &expected_plain, plain_arguments);
 }
 

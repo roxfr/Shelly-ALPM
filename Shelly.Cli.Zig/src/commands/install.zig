@@ -617,6 +617,17 @@ fn runAppImage(
     operation_context: *Zigalpm.OperationContext,
     invocation: *const parser.Invocation,
 ) !void {
+    if (elevation.isRoot()) {
+        const args = try appimageInstallArgs(context.allocator, invocation);
+        defer context.allocator.free(args);
+        if (try elevation.runAsInvokingUser(context, args)) |exit_code| {
+            if (exit_code != 0) return InstallError.BackendFailed;
+            return;
+        }
+        // A direct root invocation has no user to re-launch as. Continue
+        // with root's own user-scoped AppImage store in that case.
+    }
+
     const location = invocation.positionals[0];
     std.Io.Dir.cwd().access(context.io, location, .{}) catch return error.FileNotFound;
     if (!Zigalpm.AppImageManager.isAppImage(location)) return error.NotAnAppImage;
@@ -641,6 +652,25 @@ fn runAppImage(
     try manager.setOperationContext(operation_context);
     defer manager.setOperationContext(null) catch {};
     if (!try manager.installAppImage(location)) return InstallError.BackendFailed;
+}
+
+fn appimageInstallArgs(
+    allocator: std.mem.Allocator,
+    invocation: *const parser.Invocation,
+) ![]const []const u8 {
+    var args: std.ArrayList([]const u8) = .empty;
+    errdefer args.deinit(allocator);
+    try args.appendSlice(allocator, &.{ "install", "appimage" });
+    if (invocation.globals.no_confirm)
+        try args.append(allocator, "--no-confirm");
+    if (invocation.globals.json)
+        try args.append(allocator, "--json");
+    if (invocation.globals.ui_mode)
+        try args.append(allocator, "--ui-mode");
+    if (optionValue(invocation, "--install-path")) |install_path|
+        try args.appendSlice(allocator, &.{ "--install-path", install_path });
+    for (invocation.positionals) |positional| try args.append(allocator, positional);
+    return args.toOwnedSlice(allocator);
 }
 
 const FlatpakCandidate = struct {
@@ -1926,4 +1956,30 @@ test "Flatpak install EOL detection accepts full-ref replacement markers" {
     try std.testing.expect(replacement != null);
     try std.testing.expectEqualStrings("no.bragefuglseth.Keypunch", replacement.?.id);
     try std.testing.expectEqualStrings("beta", replacement.?.branch);
+}
+
+test "appimage install relaunch forwards positionals and install-path" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const manifest = try spec.Manifest.load(arena.allocator());
+
+    const plain_outcome = try parser.parse(arena.allocator(), &manifest, &.{
+        "install", "appimage", "/tmp/demo.AppImage",
+    });
+    try std.testing.expect(plain_outcome == .dispatch);
+    const plain_args = try appimageInstallArgs(std.testing.allocator, &plain_outcome.dispatch);
+    defer std.testing.allocator.free(plain_args);
+    const expected_plain = [_][]const u8{ "install", "appimage", "/tmp/demo.AppImage" };
+    try std.testing.expectEqualSlices([]const u8, &expected_plain, plain_args);
+
+    const full_outcome = try parser.parse(arena.allocator(), &manifest, &.{
+        "install", "appimage", "--no-confirm", "--install-path", "/opt/appimages", "/tmp/demo.AppImage",
+    });
+    try std.testing.expect(full_outcome == .dispatch);
+    const full_args = try appimageInstallArgs(std.testing.allocator, &full_outcome.dispatch);
+    defer std.testing.allocator.free(full_args);
+    const expected_full = [_][]const u8{
+        "install", "appimage", "--no-confirm", "--install-path", "/opt/appimages", "/tmp/demo.AppImage",
+    };
+    try std.testing.expectEqualSlices([]const u8, &expected_full, full_args);
 }

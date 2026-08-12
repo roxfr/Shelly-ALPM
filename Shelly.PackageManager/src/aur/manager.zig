@@ -2380,7 +2380,10 @@ fn requireReviewedFile(
         return error.UnsafePkgbuildSourcePath;
     const path = try std.fs.path.join(allocator, &.{ cache_path, file_name });
     defer allocator.free(path);
-    const status = try std.Io.Dir.cwd().statFile(io, path, .{ .follow_symlinks = false });
+    const status = std.Io.Dir.cwd().statFile(io, path, .{ .follow_symlinks = false }) catch |err| switch (err) {
+        error.FileNotFound => return error.MissingPkgbuildSourceFile,
+        else => return err,
+    };
     if (status.kind != .file) return error.UnsafePkgbuildSourcePath;
     const canonical_root = try std.Io.Dir.cwd().realPathFileAlloc(io, cache_path, allocator);
     defer allocator.free(canonical_root);
@@ -2760,7 +2763,7 @@ test "review digest covers exact local source contents and missing sources fail 
 
     try temporary.dir.deleteFile(std.testing.io, "install.sh");
     try std.testing.expectError(
-        error.FileNotFound,
+        error.MissingPkgbuildSourceFile,
         requireReviewInputs(std.testing.allocator, std.testing.io, cache_path, &info),
     );
     try temporary.dir.symLink(std.testing.io, "PKGBUILD", "install.sh", .{});
@@ -2768,6 +2771,54 @@ test "review digest covers exact local source contents and missing sources fail 
         error.UnsafePkgbuildSourcePath,
         requireReviewInputs(std.testing.allocator, std.testing.io, cache_path, &info),
     );
+}
+
+test "Dropbox brace-expanded signature is not treated as a local review input" {
+    var temporary = std.testing.tmpDir(.{});
+    defer temporary.cleanup();
+    try temporary.dir.writeFile(std.testing.io, .{
+        .sub_path = "PKGBUILD",
+        .data =
+        \\pkgname=dropbox
+        \\pkgver=258.4.3749
+        \\pkgrel=1
+        \\source=("DropboxGlyph_Blue.svg"
+        \\        "terms.txt"
+        \\        "dropbox.service"
+        \\        "dropbox@.service"
+        \\        "https://edge.dropboxstatic.com/dbx-releng/client/dropbox-lnx.x86_64-$pkgver.tar.gz"{,.asc})
+        \\
+        ,
+    });
+    const local_files = [_][]const u8{
+        "DropboxGlyph_Blue.svg",
+        "terms.txt",
+        "dropbox.service",
+        "dropbox@.service",
+    };
+    for (local_files) |file_name| {
+        try temporary.dir.writeFile(std.testing.io, .{
+            .sub_path = file_name,
+            .data = "reviewable text\n",
+        });
+    }
+
+    const cache_path = try temporary.dir.realPathFileAlloc(std.testing.io, ".", std.testing.allocator);
+    defer std.testing.allocator.free(cache_path);
+    const pkgbuild_path = try std.fs.path.join(std.testing.allocator, &.{ cache_path, "PKGBUILD" });
+    defer std.testing.allocator.free(pkgbuild_path);
+    var info = try (pkgbuild_parser.PkgbuildParser{
+        .allocator = std.testing.allocator,
+        .io = std.testing.io,
+    }).parser(pkgbuild_path);
+    defer info.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, local_files.len), info.local_source_files.?.len);
+    for (info.local_source_files.?, local_files) |actual, expected| {
+        try std.testing.expectEqualStrings(expected, actual);
+        try std.testing.expect(info.local_source_contents.contains(expected));
+    }
+    try requireReviewInputs(std.testing.allocator, std.testing.io, cache_path, &info);
 }
 
 test "fixture checkout cannot invoke fake makepkg before review and integrity gates pass" {
