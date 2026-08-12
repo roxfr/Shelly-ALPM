@@ -398,6 +398,9 @@ pub const Dispatcher = struct {
                 message = formatted;
             }
         }
+
+        defer if (allocated_message) |value|
+            self.allocator.free(value);
         
         if (self.operation) |operation| operation.status(.information, message, "alpm.information", @intFromEnum(args.event_type));
         self.dispatch(InformationalArgs, &self.informational, args);
