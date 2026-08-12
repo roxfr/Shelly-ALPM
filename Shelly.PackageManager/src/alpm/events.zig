@@ -376,7 +376,30 @@ pub const Dispatcher = struct {
     }
 
     pub fn raiseInformational(self: *Dispatcher, args: InformationalArgs) void {
-        if (self.operation) |operation| operation.status(.information, args.message, "alpm.information", @intFromEnum(args.event_type));
+
+        const prefix: ?[]const u8 = switch (args.event_type) {
+            .pkg_retrieve_start => "Downloading",
+            .pkg_retrieve_done => "Download Completed",
+            .pkg_retrieve_failed => "Download Failed",
+            else => null,
+        };
+        
+        var message: []const u8 = args.message;
+        var allocated_message:  ?[]u8 = null;
+        
+        if (prefix) |value| {
+            allocated_message = std.fmt.allocPrint(
+                self.allocator,
+                "{s}: {s}",
+                .{ value, args.message },
+            ) catch null;
+    
+            if (allocated_message) |formatted| {
+                message = formatted;
+            }
+        }
+        
+        if (self.operation) |operation| operation.status(.information, message, "alpm.information", @intFromEnum(args.event_type));
         self.dispatch(InformationalArgs, &self.informational, args);
     }
 
