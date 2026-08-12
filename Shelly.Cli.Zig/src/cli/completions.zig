@@ -30,13 +30,34 @@ fn renderBash(manifest: *const spec.Manifest, writer: *std.Io.Writer) !void {
     try writer.writeAll(
         \\# Bash completions for shelly
         \\# Auto-generated from the native Shelly CLI catalog. Do not edit.
+        \\_shelly_packages_standard_sync() {
+        \\    pacman -Slq 2>/dev/null
+        \\}
+        \\
+        \\_shelly_packages_standard_local() {
+        \\    pacman -Qq 2>/dev/null
+        \\}
+        \\
+        \\_shelly_packages_aur_local() {
+        \\    pacman -Qqm 2>/dev/null
+        \\}
+        \\
+        \\_shelly_packages_flatpak_remote() {
+        \\    flatpak remote-ls --app --columns=application 2>/dev/null
+        \\}
+        \\
+        \\_shelly_packages_flatpak_local() {
+        \\    flatpak list --app --columns=application 2>/dev/null
+        \\}
+        \\
         \\_shelly() {
-        \\    local cur prev action selector
+        \\    local cur prev action selector consumed
         \\    COMPREPLY=()
         \\    cur="${COMP_WORDS[COMP_CWORD]}"
         \\    prev="${COMP_WORDS[COMP_CWORD-1]}"
         \\    action="${COMP_WORDS[1]}"
         \\    selector="${COMP_WORDS[2]}"
+        \\    consumed=0
         \\
         \\    if (( COMP_CWORD == 1 )); then
         \\        COMPREPLY=( $(compgen -W '
@@ -44,10 +65,21 @@ fn renderBash(manifest: *const spec.Manifest, writer: *std.Io.Writer) !void {
     try writeChildNames(manifest, manifest.root(), writer);
     try writer.writeByte(' ');
     try writeOptionWords(manifest.root().options, writer);
+    if (hasShortcodes(manifest)) {
+        try writer.writeByte(' ');
+        try writeShortcodeWords(manifest, writer);
+    }
     try writer.writeAll(
         \\' -- "$cur") )
         \\        return
         \\    fi
+        \\
+        \\    case "$action" in
+        \\
+    );
+    try writeBashShortcodes(manifest, writer);
+    try writer.writeAll(
+        \\    esac
         \\
         \\    case "$action" in
         \\
@@ -59,7 +91,7 @@ fn renderBash(manifest: *const spec.Manifest, writer: *std.Io.Writer) !void {
         try writeBashChoiceCases(manifest, action, writer);
         const default_child = manifest.findDefaultChild(action);
         if (default_child) |child| {
-            try writer.writeAll("            if (( COMP_CWORD == 2 )); then\n                COMPREPLY=( $(compgen -W '");
+            try writer.writeAll("            if (( COMP_CWORD == 2 && consumed == 0 )); then\n                COMPREPLY=( $(compgen -W '");
             try writeNonDefaultChildNames(manifest, action, child, writer);
             if (hasNonDefaultChildren(manifest, action, child)) try writer.writeByte(' ');
             try writeEffectiveOptionWords(manifest, child, writer);
@@ -67,23 +99,23 @@ fn renderBash(manifest: *const spec.Manifest, writer: *std.Io.Writer) !void {
             try writer.writeAll("            case \"$selector\" in\n");
             for (manifest.commands) |*candidate| {
                 if (!isChildOf(candidate, action) or candidate == child) continue;
-                try writer.print("                {s}) COMPREPLY=( $(compgen -W '", .{candidate.name});
-                try writeEffectiveOptionWords(manifest, candidate, writer);
-                try writer.writeAll("' -- \"$cur\") ) ;;\n");
+                try writer.print("                {s})\n", .{candidate.name});
+                try writeBashArguments(manifest, candidate, "                    ", writer);
+                try writer.writeAll("                    ;;\n");
             }
-            try writer.writeAll("                *) COMPREPLY=( $(compgen -W '");
-            try writeEffectiveOptionWords(manifest, child, writer);
-            try writer.writeAll("' -- \"$cur\") ) ;;\n            esac\n");
+            try writer.writeAll("                *)\n");
+            try writeBashArguments(manifest, child, "                    ", writer);
+            try writer.writeAll("                    ;;\n            esac\n");
         } else {
-            try writer.writeAll("            if (( COMP_CWORD == 2 )); then\n                COMPREPLY=( $(compgen -W '");
+            try writer.writeAll("            if (( COMP_CWORD == 2 && consumed == 0 )); then\n                COMPREPLY=( $(compgen -W '");
             try writeChildNames(manifest, action, writer);
             try writer.writeAll("' -- \"$cur\") )\n                return\n            fi\n");
             try writer.writeAll("            case \"$selector\" in\n");
             for (manifest.commands) |*child| {
                 if (!isChildOf(child, action)) continue;
-                try writer.print("                {s}) COMPREPLY=( $(compgen -W '", .{child.name});
-                try writeEffectiveOptionWords(manifest, child, writer);
-                try writer.writeAll("' -- \"$cur\") ) ;;\n");
+                try writer.print("                {s})\n", .{child.name});
+                try writeBashArguments(manifest, child, "                    ", writer);
+                try writer.writeAll("                    ;;\n");
             }
             try writer.writeAll("            esac\n");
         }
@@ -95,6 +127,30 @@ fn renderBash(manifest: *const spec.Manifest, writer: *std.Io.Writer) !void {
         \\complete -F _shelly shelly
         \\
     );
+}
+
+fn writeBashArguments(
+    manifest: *const spec.Manifest,
+    command: *const spec.Command,
+    indent: []const u8,
+    writer: *std.Io.Writer,
+) !void {
+    try writer.print("{s}if [[ \"$cur\" == -* ]]; then\n", .{indent});
+    try writer.print("{s}    COMPREPLY=( $(compgen -W '", .{indent});
+    try writeEffectiveOptionWords(manifest, command, writer);
+    try writer.writeAll("' -- \"$cur\") )\n");
+    if (command.arguments.len > 0) {
+        if (packageCompleter(command)) |helper| {
+            if (bashPackageCompleter(helper)) |bash_helper| {
+                try writer.print("{s}else\n", .{indent});
+                try writer.print("{s}    COMPREPLY=( $(compgen -W \"$({s})\" -- \"$cur\") )\n", .{ indent, bash_helper });
+            }
+        } else if (isAppimageInstall(command)) {
+            try writer.print("{s}else\n", .{indent});
+            try writer.print("{s}    COMPREPLY=( $(compgen -f -X '!*.AppImage' -- \"$cur\") )\n", .{indent});
+        }
+    }
+    try writer.print("{s}fi\n", .{indent});
 }
 
 fn writeBashChoiceCases(
@@ -130,21 +186,99 @@ fn renderFish(manifest: *const spec.Manifest, writer: *std.Io.Writer) !void {
     try writer.writeAll(
         \\# Fish completions for shelly
         \\# Auto-generated from the native Shelly CLI catalog. Do not edit.
+        \\function __shelly_packages_standard_sync
+        \\    pacman -Slq 2>/dev/null
+        \\end
+        \\
+        \\function __shelly_packages_standard_local
+        \\    pacman -Qq 2>/dev/null
+        \\end
+        \\
+        \\function __shelly_packages_aur_local
+        \\    pacman -Qqm 2>/dev/null
+        \\end
+        \\
+        \\function __shelly_packages_flatpak_remote
+        \\    flatpak remote-ls --app --columns=application 2>/dev/null
+        \\end
+        \\
+        \\function __shelly_packages_flatpak_local
+        \\    flatpak list --app --columns=application 2>/dev/null
+        \\end
+        \\
+        \\function __shelly_shortcut
+        \\    set -l cmd (commandline -opc)
+        \\    test (count $cmd) -ge 2; and contains -- $cmd[2] $argv
+        \\end
+        \\
         \\complete -c shelly -f
         \\
     );
+    var top_level_condition = std.Io.Writer.Allocating.init(std.heap.page_allocator);
+    defer top_level_condition.deinit();
+    try top_level_condition.writer.writeAll("__fish_use_subcommand");
+    {
+        var any_shortcut = std.Io.Writer.Allocating.init(std.heap.page_allocator);
+        defer any_shortcut.deinit();
+        try any_shortcut.writer.writeAll("__shelly_shortcut");
+        for (manifest.commands) |*command| {
+            const action_code = command.actionCode orelse continue;
+            var codes: [16]u8 = undefined;
+            for (collectTypeCodes(command, &codes)) |type_code| {
+                try any_shortcut.writer.print(" -{c}{c}", .{ action_code, type_code });
+            }
+        }
+        if (any_shortcut.writer.buffered().len > "__shelly_shortcut".len) {
+            try top_level_condition.writer.print("; and not {s}", .{any_shortcut.writer.buffered()});
+        }
+    }
+
     for (manifest.root().options) |option| {
         try writeFishOption(
             option,
-            if (option.recursive) null else "__fish_use_subcommand",
+            if (option.recursive) null else top_level_condition.writer.buffered(),
             writer,
         );
     }
     try writer.writeByte('\n');
 
+    // Top-level shortcode completions (e.g., -Ss, -Is, -Ks).
+    for (manifest.commands) |*command| {
+        const action_code = command.actionCode orelse continue;
+        var codes: [16]u8 = undefined;
+        for (collectTypeCodes(command, &codes)) |type_code| {
+            try writer.print(
+                "complete -c shelly -f -n '{s}' -a '-{c}{c}' -d '",
+                .{ top_level_condition.writer.buffered(), action_code, type_code },
+            );
+            try writeFishEscaped(writer, command.description orelse "");
+            try writer.writeAll("'\n");
+        }
+    }
+
+    // Shortcut-conditioned option and positional completions.
+    for (manifest.commands) |*command| {
+        const action_code = command.actionCode orelse continue;
+        var codes: [16]u8 = undefined;
+        const type_codes = collectTypeCodes(command, &codes);
+        if (type_codes.len == 0) continue;
+
+        var shortcut_condition = std.Io.Writer.Allocating.init(std.heap.page_allocator);
+        defer shortcut_condition.deinit();
+        try shortcut_condition.writer.writeAll("__shelly_shortcut");
+        for (type_codes) |type_code| {
+            try shortcut_condition.writer.print(" -{c}{c}", .{ action_code, type_code });
+        }
+
+        for (command.options) |option| {
+            try writeFishOption(option, shortcut_condition.writer.buffered(), writer);
+        }
+        try writeFishPositional(command, shortcut_condition.writer.buffered(), writer);
+    }
+
     for (manifest.commands) |*action| {
         if (!isChildOf(action, manifest.root())) continue;
-        try writer.print("complete -c shelly -f -n '__fish_use_subcommand' -a '{s}' -d '", .{action.name});
+        try writer.print("complete -c shelly -f -n '{s}' -a '{s}' -d '", .{ top_level_condition.writer.buffered(), action.name });
         try writeFishEscaped(writer, action.description orelse "");
         try writer.writeAll("'\n");
 
@@ -167,6 +301,7 @@ fn renderFish(manifest: *const spec.Manifest, writer: *std.Io.Writer) !void {
                 try condition.writer.print("; and not __fish_seen_subcommand_from {s}", .{other.name});
             }
             for (child.options) |option| try writeFishOption(option, condition.writer.buffered(), writer);
+            try writeFishPositional(child, condition.writer.buffered(), writer);
         }
         for (manifest.commands) |*child| {
             if (!isChildOf(child, action) or child == default_child) continue;
@@ -174,7 +309,21 @@ fn renderFish(manifest: *const spec.Manifest, writer: *std.Io.Writer) !void {
             defer condition.deinit();
             try condition.writer.print("__fish_seen_subcommand_from {s}; and __fish_seen_subcommand_from {s}", .{ action.name, child.name });
             for (child.options) |option| try writeFishOption(option, condition.writer.buffered(), writer);
+            try writeFishPositional(child, condition.writer.buffered(), writer);
         }
+    }
+}
+
+fn writeFishPositional(command: *const spec.Command, condition: []const u8, writer: *std.Io.Writer) !void {
+    if (command.arguments.len == 0) return;
+    if (packageCompleter(command)) |helper| {
+        if (fishPackageCompleter(helper)) |fish_helper| {
+            try writer.print("complete -c shelly -f -n '{s}' -a '({s})'\n", .{ condition, fish_helper });
+        }
+        return;
+    }
+    if (isAppimageInstall(command)) {
+        try writer.print("complete -c shelly -f -n '{s}' -a '(__fish_complete_suffix .AppImage)'\n", .{condition});
     }
 }
 
@@ -487,6 +636,44 @@ fn parentActionName(command: *const spec.Command) []const u8 {
     return parent_path;
 }
 
+/// Returns true when at least one catalog command exposes a shortcode.
+fn hasShortcodes(manifest: *const spec.Manifest) bool {
+    for (manifest.commands) |*command| {
+        if (command.actionCode == null) continue;
+        var codes: [16]u8 = undefined;
+        if (collectTypeCodes(command, &codes).len > 0) return true;
+    }
+    return false;
+}
+
+/// Writes the space-separated shortcode tokens (e.g., `-Ss -Is -Ks`) for compgen word lists.
+fn writeShortcodeWords(manifest: *const spec.Manifest, writer: *std.Io.Writer) !void {
+    var wrote = false;
+    for (manifest.commands) |*command| {
+        const action_code = command.actionCode orelse continue;
+        var codes: [16]u8 = undefined;
+        for (collectTypeCodes(command, &codes)) |type_code| {
+            if (wrote) try writer.writeByte(' ');
+            try writer.print("-{c}{c}", .{ action_code, type_code });
+            wrote = true;
+        }
+    }
+}
+
+/// Writes the Bash `case` branches that translate shortcode tokens into action/selector/consumed.
+fn writeBashShortcodes(manifest: *const spec.Manifest, writer: *std.Io.Writer) !void {
+    for (manifest.commands) |*command| {
+        const action_code = command.actionCode orelse continue;
+        var codes: [16]u8 = undefined;
+        for (collectTypeCodes(command, &codes)) |type_code| {
+            try writer.print(
+                "        -{c}{c}) action=\"{s}\"; selector=\"{s}\"; consumed=1 ;;\n",
+                .{ action_code, type_code, parentActionName(command), command.name },
+            );
+        }
+    }
+}
+
 fn packageCompleter(command: *const spec.Command) ?[]const u8 {
     if (std.mem.eql(u8, command.path, "shelly install standard") or
         std.mem.eql(u8, command.path, "shelly search standard"))
@@ -500,6 +687,24 @@ fn packageCompleter(command: *const spec.Command) ?[]const u8 {
         return "_shelly_packages_flatpak_remote";
     if (std.mem.eql(u8, command.path, "shelly remove flatpak"))
         return "_shelly_packages_flatpak_local";
+    return null;
+}
+
+fn bashPackageCompleter(helper: []const u8) ?[]const u8 {
+    if (std.mem.eql(u8, helper, "_shelly_packages_standard_sync")) return "_shelly_packages_standard_sync";
+    if (std.mem.eql(u8, helper, "_shelly_packages_standard_local")) return "_shelly_packages_standard_local";
+    if (std.mem.eql(u8, helper, "_shelly_packages_aur_local")) return "_shelly_packages_aur_local";
+    if (std.mem.eql(u8, helper, "_shelly_packages_flatpak_remote")) return "_shelly_packages_flatpak_remote";
+    if (std.mem.eql(u8, helper, "_shelly_packages_flatpak_local")) return "_shelly_packages_flatpak_local";
+    return null;
+}
+
+fn fishPackageCompleter(helper: []const u8) ?[]const u8 {
+    if (std.mem.eql(u8, helper, "_shelly_packages_standard_sync")) return "__shelly_packages_standard_sync";
+    if (std.mem.eql(u8, helper, "_shelly_packages_standard_local")) return "__shelly_packages_standard_local";
+    if (std.mem.eql(u8, helper, "_shelly_packages_aur_local")) return "__shelly_packages_aur_local";
+    if (std.mem.eql(u8, helper, "_shelly_packages_flatpak_remote")) return "__shelly_packages_flatpak_remote";
+    if (std.mem.eql(u8, helper, "_shelly_packages_flatpak_local")) return "__shelly_packages_flatpak_local";
     return null;
 }
 
@@ -619,6 +824,25 @@ test "renders Bash Fish and Zsh scripts from the native catalog" {
         try std.testing.expect(std.mem.indexOf(u8, script, "pacfiles") != null);
         try std.testing.expect(std.mem.indexOf(u8, script, "threeway") != null);
         try std.testing.expect(std.mem.indexOf(u8, script, "bash fish zsh") != null);
+        if (expected.shell == .bash) {
+            try std.testing.expect(std.mem.indexOf(u8, script, "_shelly_packages_standard_sync") != null);
+            try std.testing.expect(std.mem.indexOf(u8, script, "_shelly_packages_flatpak_local") != null);
+            try std.testing.expect(std.mem.indexOf(u8, script, "compgen -f -X '!*.AppImage'") != null);
+            // Shortcodes dispatch directly to their command variant.
+            try std.testing.expect(std.mem.indexOf(u8, script, "-Ss) action=\"search\"; selector=\"standard\"; consumed=1 ;;") != null);
+            try std.testing.expect(std.mem.indexOf(u8, script, "-Ks) action=\"keyring\"; selector=\"lsign\"; consumed=1 ;;") != null);
+            // Alias type codes dispatch to the same variant.
+            try std.testing.expect(std.mem.indexOf(u8, script, "-LI) action=\"list\"; selector=\"appimage\"; consumed=1 ;;") != null);
+        }
+        if (expected.shell == .fish) {
+            try std.testing.expect(std.mem.indexOf(u8, script, "function __shelly_packages_standard_sync") != null);
+            try std.testing.expect(std.mem.indexOf(u8, script, "function __shelly_packages_flatpak_local") != null);
+            try std.testing.expect(std.mem.indexOf(u8, script, "(__fish_complete_suffix .AppImage)") != null);
+            // Shortcodes themselves, their command options, and alias type codes are emitted.
+            try std.testing.expect(std.mem.indexOf(u8, script, "-a '-Ss'") != null);
+            try std.testing.expect(std.mem.indexOf(u8, script, "__shelly_shortcut -Is") != null);
+            try std.testing.expect(std.mem.indexOf(u8, script, "-a '-LI'") != null);
+        }
         if (expected.shell == .zsh) {
             // Regression for malformed _arguments specs.
             try std.testing.expect(std.mem.indexOf(u8, script, "'{--") == null);

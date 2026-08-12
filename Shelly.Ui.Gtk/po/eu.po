@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Shelly-ALPM / Shelly: GTK\n"
 "Report-Msgid-Bugs-To: csnyder@seafoamlabs.org\n"
-"POT-Creation-Date: 2026-08-10 23:33+0300\n"
+"POT-Creation-Date: 2026-08-12 09:19-0400\n"
 "PO-Revision-Date: 2026-07-27 19:10+0200\n"
 "Last-Translator: bingen <bingenm@gmail.com>\n"
 "Language-Team: Basque <translation-team-eu@googlegroups.com>\n"
@@ -16,13 +16,30 @@ msgstr ""
 "X-Generator: Weblate 2026.7\n"
 
 msgid "No installable addons available"
-msgstr ""
+msgstr "Ez dago instalatzeko addonik eskuragarri"
 
 msgid "Close"
 msgstr "Itxi"
 
+#| msgid "Saving update configuration"
+msgid "Keep configuration"
+msgstr ""
+
+msgid "App data and settings will be kept."
+msgstr ""
+
+#| msgid "Saving update configuration"
+msgid "Remove configuration"
+msgstr ""
+
+msgid "App data will be permanently removed."
+msgstr ""
+
 msgid "Confirm"
 msgstr "Berretsi"
+
+msgid "Cancel"
+msgstr "Utzi"
 
 msgid "Skip"
 msgstr "Eskapatu"
@@ -49,11 +66,8 @@ msgstr ""
 msgid "Source Files"
 msgstr "Jatorrizko fitxategiak"
 
-msgid "Cancel"
-msgstr "Utzi"
-
 msgid "polkit is required"
-msgstr ""
+msgstr "polkit beharrezkoa da"
 
 msgid ""
 "Shelly's GUI needs <b>polkit</b> installed and running to authorize "
@@ -63,7 +77,7 @@ msgid ""
 "\n"
 "<a href=\"https://www.seafoam-labs.org/shelly-alpm/docs/polkit/\">seafoam-"
 "labs.org/shelly-alpm/docs/polkit</a>"
-msgstr ""
+msgstr "Shelly-ren GUIak <b>polkit</b> instalatuta eta martxan behar du ekintza pribilegiatuak baimentzeko, baina ez da sistema-busean aurkitu.\n\nInstalatu eta gaitu, eta saiatu berriro.\n\n<a href=\"https://www.seafoam-labs.org/shelly-alpm/docs/polkit/\">seafoam-labs.org/shelly-alpm/docs/polkit</a>"
 
 msgid "Review PKGBUILD"
 msgstr "Berrikusi PKGBUILD"
@@ -306,6 +320,9 @@ msgstr "Flatpak-en konponketa"
 msgid "Repairs Flatpak Installation (Experimental)"
 msgstr "Flatpak instalazioa konpontzen du (Esperimentala)"
 
+msgid "About"
+msgstr ""
+
 msgid "Shelly"
 msgstr "Shelly"
 
@@ -349,7 +366,7 @@ msgid "Repository"
 msgstr "Biltegia"
 
 msgid "Install Date"
-msgstr ""
+msgstr "Instalazio-data"
 
 msgid "Had an issue loading your packages. Check if you have a db lock."
 msgstr ""
@@ -398,6 +415,39 @@ msgid ""
 msgstr ""
 "Ez da gomendiorik aurkitu. Mesedez, egiaztatu zure interneteko konexioa eta "
 "saiatu berriro."
+
+msgid "Search standard repositories, AUR and Flatpak"
+msgstr ""
+
+msgid "Standard"
+msgstr ""
+
+msgid "Show results from the configured ALPM sync databases"
+msgstr ""
+
+msgid "AUR"
+msgstr "AUR"
+
+msgid "Show results from the Arch User Repository"
+msgstr ""
+
+msgid "Flatpak"
+msgstr "Flatpak"
+
+msgid "Show results from the configured Flatpak remotes"
+msgstr ""
+
+#| msgid "Source Files"
+msgid "Source"
+msgstr ""
+
+msgid "Search everywhere"
+msgstr ""
+
+msgid ""
+"Search standard repositories, the AUR and Flatpak at once. Type a name to "
+"begin."
+msgstr ""
 
 msgid "General"
 msgstr "Orokorra"
@@ -560,12 +610,6 @@ msgstr "Bertsio-berritu"
 msgid "System"
 msgstr "Sistema"
 
-msgid "AUR"
-msgstr "AUR"
-
-msgid "Flatpak"
-msgstr "Flatpak"
-
 msgid "Checking for updates…"
 msgstr "Eguneraketak bilatzen…"
 
@@ -635,6 +679,8 @@ msgid ""
 "Shelly is a modern package manager for Arch Linux. Configure your sources "
 "and preferences to get started."
 msgstr ""
+"Shelly Arch Linux-erako pakete-kudeatzaile modernoa da. Konfiguratu zure "
+"iturriak eta hobespenak hasteko."
 
 msgid "Select Your Sources"
 msgstr "Hautatu zure iturriak"
@@ -662,7 +708,7 @@ msgid "Recommended"
 msgstr "Gomendatuak"
 
 msgid "Curated picks from Shelly"
-msgstr ""
+msgstr "Shelly-ren hautapenak"
 
 msgid "Look and Feel"
 msgstr "Itxura eta portaera"
@@ -857,19 +903,19 @@ msgid "First Submitted"
 msgstr "Lehen aldiz bidalia"
 
 msgid "URL"
-msgstr ""
+msgstr "URL"
 
 msgid "Licenses"
 msgstr "Lizentziak"
 
 msgid "Depends"
-msgstr "Menderakotasunak"
+msgstr "Menpekotasunak"
 
 msgid "Optional Depends"
 msgstr "Aukerako menpekotasunak"
 
 msgid "Make Depends"
-msgstr "Eraikitze-menderakotasunak"
+msgstr "Eraikitze-menpekotasunak"
 
 msgid "Section"
 msgstr "Atala"
@@ -968,7 +1014,7 @@ msgid "Available Addons"
 msgstr "Gehigarri eskuragarriak"
 
 msgid "Installing flatpak addon"
-msgstr ""
+msgstr "Flatpak addona instalatzen"
 
 msgid "Unknown developer"
 msgstr "Garatzaile ezezaguna"
@@ -1102,17 +1148,52 @@ msgstr "Urruneko jatorria kentzen"
 msgid "Adding Remote"
 msgstr "Urruneko jatorria gehitzen"
 
+#| msgid "Removing Flatpak"
+msgid "Remove this Flatpak?"
+msgstr ""
+
+#| msgid "Removing Flatpak"
+msgid "Remove Flatpak"
+msgstr ""
+
 msgid "Removing Flatpak"
 msgstr "Flatpak kentzen"
 
-msgid "Loading..."
-msgstr "Kargatzen..."
+msgid "App ID"
+msgstr ""
+
+#| msgid "Remove"
+msgid "Remote"
+msgstr ""
+
+#| msgid "Development"
+msgid "Developer"
+msgstr ""
+
+msgid "Type"
+msgstr ""
+
+msgid "Download Size"
+msgstr "Deskargaren tamaina"
 
 msgid "Installed Size"
 msgstr "Instalatutako tamaina"
 
-msgid "Download Size"
-msgstr "Deskargaren tamaina"
+msgid "Yes"
+msgstr "Bai"
+
+msgid "No"
+msgstr "Ez"
+
+msgid "Keywords"
+msgstr ""
+
+#| msgid "e.g., flathub"
+msgid "Flathub"
+msgstr ""
+
+msgid "Loading..."
+msgstr "Kargatzen..."
 
 msgid "Build Date"
 msgstr "Eraikitze-data"
@@ -1180,6 +1261,29 @@ msgstr "Paketeak kentzen"
 msgid "Installing packages"
 msgstr "Paketeak instalatzen"
 
+#| msgid "Operation failed"
+msgid "Search failed"
+msgstr ""
+
+#| msgid "Installation failed."
+msgid "Installation in progress"
+msgstr ""
+
+#| msgid "No packages selected"
+msgid "No sources selected"
+msgstr ""
+
+msgid "Enable at least one source filter above."
+msgstr ""
+
+#| msgid "Installing packages"
+msgid "Install Packages"
+msgstr ""
+
+#| msgid "Remove the selected packages?"
+msgid "Install the selected packages?"
+msgstr ""
+
 msgid "Failed to save settings"
 msgstr "Ezin izan dira ezarpenak gorde"
 
@@ -1187,28 +1291,28 @@ msgid "Settings saved"
 msgstr "Ezarpenak gorde dira"
 
 msgid "Installing Flatpak support"
-msgstr ""
+msgstr "Flatpak euskarria instalatzen"
 
 msgid "Installing AppImage support"
-msgstr ""
+msgstr "AppImage euskarria instalatzen"
 
 msgid "Failed to start Flatpak support installation"
-msgstr ""
+msgstr "Huts egin du Flatpak euskarriaren instalazioa abiatzean"
 
 msgid "Failed to start AppImage support installation"
-msgstr ""
+msgstr "Huts egin du AppImage euskarriaren instalazioa abiatzean"
 
 msgid "Flatpak support installation failed"
-msgstr ""
+msgstr "Flatpak euskarriaren instalazioak huts egin du"
 
 msgid "AppImage support installation failed"
-msgstr ""
+msgstr "AppImage euskarriaren instalazioak huts egin du"
 
 msgid "Flatpak support enabled"
-msgstr ""
+msgstr "Flatpak euskarria gaituta"
 
 msgid "AppImage support enabled"
-msgstr ""
+msgstr "AppImage euskarria gaituta"
 
 msgid "No changelog entries found"
 msgstr "Ez da aldaketa-erregistrorik aurkitu"
@@ -1361,19 +1465,19 @@ msgid "Removing"
 msgstr "Kentzen"
 
 msgid "Checking keyring"
-msgstr ""
+msgstr "Gako-sorta egiaztatzen"
 
 msgid "Checking integrity"
-msgstr ""
+msgstr "Osotasuna egiaztatzen"
 
 msgid "Loading packages"
-msgstr ""
+msgstr "Paketeak kargatzen"
 
 msgid "Checking conflicts"
-msgstr ""
+msgstr "Gatazkak egiaztatzen"
 
 msgid "Checking disk space"
-msgstr ""
+msgstr "Disko-espazioa egiaztatzen"
 
 msgid "Working"
 msgstr "Lanean"
@@ -1393,12 +1497,6 @@ msgstr "irten"
 msgid "Cancelled"
 msgstr "Ezeztatuta"
 
-msgid "Yes"
-msgstr "Bai"
-
-msgid "No"
-msgstr "Ez"
-
 msgid "System package update"
 msgstr "Sistemako paketeen eguneraketa"
 
@@ -1411,7 +1509,7 @@ msgstr ""
 "saiatu berriro."
 
 msgid "Update this package"
-msgstr ""
+msgstr "Eguneratu pakete hau"
 
 msgid "of"
 msgstr "itzat"
@@ -1464,10 +1562,30 @@ msgstr ""
 "erakusten dituzte. Pakete-datuak kanpoko iturrietatik eskuratzen dira."
 
 msgid "Installing Flatpak and AppImage support"
-msgstr ""
+msgstr "Flatpak eta AppImage euskarria instalatzen"
 
 msgid "Settings"
 msgstr "Ezarpenak"
 
 msgid "Package"
 msgstr "Paketea"
+
+#~ msgid ""
+#~ "Shelly's GUI needs <b>polkit</b> installed and running to authorize "
+#~ "privileged actions, but it wasn't found on the system bus.\n"
+#~ "\n"
+#~ "Install and enable it, then retry.\n"
+#~ "\n"
+#~ "<a href=\"https://wiki.archlinux.org/title/Polkit\">wiki.archlinux.org/"
+#~ "title/Polkit</a>"
+#~ msgstr ""
+#~ "Shelly-ren GUIak <b>polkit</b> instalatuta eta martxan behar du ekintza "
+#~ "pribilegiatuak baimentzeko, baina ez da sistema-busean aurkitu.\n"
+#~ "\n"
+#~ "Instalatu eta gaitu, eta saiatu berriro.\n"
+#~ "\n"
+#~ "<a href=\"https://wiki.archlinux.org/title/Polkit\">wiki.archlinux.org/"
+#~ "title/Polkit</a>"
+
+#~ msgid "Show dependency packages on;y"
+#~ msgstr "Erakutsi menpekotasun-paketeak soilik"
