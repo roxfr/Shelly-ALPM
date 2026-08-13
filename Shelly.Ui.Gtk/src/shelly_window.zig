@@ -145,7 +145,7 @@ pub const ShellyWindow = extern struct {
         defer dbus.deinit();
 
         const status = dbus.checkPolkitStatus();
-        if (status != .ready) {
+        if (status == .no_agent or status == .no_daemon) {
             const dialog = PolkitDialog.new(&on_polkit_close, self);
             self.showLockout(dialog.as(gtk.Widget));
             dialog.focusClose();
